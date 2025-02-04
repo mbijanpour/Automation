@@ -1,5 +1,21 @@
+# Ignore the .gitignore file itself
 .gitignore
-venv
+
+# Ignore virtual environment directory
+venv/
+
+# Ignore sensitive keys file
 keys.py
+
+# Ignore database file
 telegram_bot.db
-_pycache_
+
+# Ignore Python cache directories
+__pycache__/
+*.pyc
+
+# Ignore other common files and directories
+.DS_Store
+*.log
+*.sqlite3
+*.env
