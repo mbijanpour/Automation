@@ -1,3 +1,5 @@
+.gitignore
 venv
 keys.py
 telegram_bot.db
+_pycache_
