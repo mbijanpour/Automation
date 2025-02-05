@@ -4,7 +4,7 @@ import telegram
 import asyncio
 import sqlite3
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
-from telegram.ext import Updater, CommandHandler, MessageHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler
 from telegram.utils.request import Request
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -75,6 +75,12 @@ def start(update, context):
 
 
 def screenshot(update, context):
+    if update.message:
+        update.message.reply_text("Monitoring...")
+    else:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id, text="Monitoring...")
+
     event_handler = ScreenshotHandler()
     observer = Observer()
     observer.schedule(event_handler, path=SCREENSHOT_DIR, recursive=False)
@@ -89,11 +95,34 @@ def screenshot(update, context):
     observer.join()
 
 
+def admin(update, context):
+    user = update.message.from_user
+    if user.id == int(TELEGRAM_CHAT_ID):
+        update.message.reply_text("Admin activities granted")
+        keyboard = [[InlineKeyboardButton(
+            text="Screenshot", callback_data='screenshot')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_text('Admin panel', reply_markup=reply_markup)
+    else:
+        return
+
+
+def button(update, context):
+    query = update.callback_query
+    query.answer()
+
+    if query.data == 'screenshot':
+        screenshot(update, context)
+
+
 updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
+dispatcher.add_handler(CallbackQueryHandler(button))
+
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CommandHandler("screenshot", screenshot))
+dispatcher.add_handler(CommandHandler("admin", admin))
 
 updater.start_polling()
 updater.idle()
