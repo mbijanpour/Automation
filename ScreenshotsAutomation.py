@@ -4,7 +4,7 @@ import telegram
 import asyncio
 import sqlite3
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler, Filters
 from telegram.utils.request import Request
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -125,8 +125,14 @@ def admin(update, context):
     user = update.message.from_user
     if user.id == int(TELEGRAM_CHAT_ID):
         update.message.reply_text("Admin activities granted")
-        keyboard = [[InlineKeyboardButton(
-            text="Screenshot", callback_data='screenshot')]]
+        keyboard = [
+            [InlineKeyboardButton(text="Screenshot",
+                                  callback_data='screenshot')],
+            [InlineKeyboardButton(text="Send to all",
+                                  callback_data='send_all')],
+            [InlineKeyboardButton(text="Send to user",
+                                  callback_data='send_user')]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         update.message.reply_text('Admin panel', reply_markup=reply_markup)
     else:
@@ -139,6 +145,45 @@ def button(update, context):
 
     if query.data == 'screenshot':
         screenshot(update, context)
+    elif query.data == 'send_all':
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="Please send the message you want to broadcast to all users."
+        )
+        context.user_data['broadcast'] = True
+
+
+def handle_message(update, context):
+    if context.user_data.get('broadcast'):
+        cursor.execute("SELECT user_id FROM users")
+        users = cursor.fetchall()
+        if update.message.text:
+            message = update.message.text
+            for user in users:
+                context.bot.send_message(chat_id=user[0], text=message)
+        elif update.message.sticker:
+            sticker = update.message.sticker.file_id
+            for user in users:
+                context.bot.send_sticker(chat_id=user[0], sticker=sticker)
+        elif update.message.photo:
+            photo = update.message.photo[-1].file_id
+            for user in users:
+                context.bot.send_photo(chat_id=user[0], photo=photo)
+            context.user_data['broadcast'] = False
+        elif update.message.video:
+            video = update.message.video.file_id
+            for user in users:
+                context.bot.send_video(chat_id=user[0], video=video)
+        elif update.message.document:
+            document = update.message.document.file_id
+            for user in users:
+                context.bot.send_document(chat_id=user[0], document=document)
+        elif update.message.animation:
+            animation = update.message.animation.file_id
+            for user in users:
+                context.bot.send_animation(
+                    chat_id=user[0], animation=animation)
+    context.user_data['broadcast'] = False
 
 
 updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
@@ -150,6 +195,15 @@ dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CommandHandler("screenshot", screenshot))
 dispatcher.add_handler(CommandHandler("admin", admin))
 dispatcher.add_handler(CommandHandler("stop", stop))
+
+dispatcher.add_handler(MessageHandler(
+    Filters.text & ~Filters.command, handle_message))
+dispatcher.add_handler(MessageHandler(Filters.photo, handle_message))
+dispatcher.add_handler(MessageHandler(Filters.video, handle_message))
+dispatcher.add_handler(MessageHandler(Filters.document, handle_message))
+dispatcher.add_handler(MessageHandler(Filters.sticker, handle_message))
+dispatcher.add_handler(MessageHandler(Filters.animation, handle_message))
+
 
 updater.start_polling()
 updater.idle()
