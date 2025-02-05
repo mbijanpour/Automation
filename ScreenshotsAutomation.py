@@ -151,6 +151,12 @@ def button(update, context):
             text="Please send the message you want to broadcast to all users."
         )
         context.user_data['broadcast'] = True
+    elif query.data == 'send_user':
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="Please send the user ID and the message you want to send in the format: user_id:message"
+        )
+        context.user_data['send_user'] = True
 
 
 def handle_message(update, context):
@@ -202,8 +208,20 @@ def handle_message(update, context):
                         chat_id=user[0], animation=animation)
                 except telegram.error.Unauthorized:
                     print(f"User {user[0]} has blocked the bot.")
-
         context.user_data['broadcast'] = False
+
+    elif context.user_data.get('send_user'):
+        try:
+            id, message = update.message.text.split(':', 1)
+            context.bot.send_message(chat_id=id, text=message)
+            update.message.reply_text("Message sent to user.")
+        except ValueError:
+            update.message.reply_text(
+                "Invalid format. Please use the format: user_id:message")
+        except telegram.error.Unauthorized:
+            print(f"User {id} has blocked the bot.")
+        context.user_data['send_user'] = False
+
     elif context.user_data.get('update_user_id'):
         new_user_id = update.message.text
         update_user_id(new_user_id)
