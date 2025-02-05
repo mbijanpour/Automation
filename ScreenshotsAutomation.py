@@ -8,6 +8,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryH
 from telegram.utils.request import Request
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+import threading
 
 from keys import *
 
@@ -19,16 +20,19 @@ TELEGRAM_CHAT_ID = TELEGRAM_CHAT_ID
 conn = sqlite3.connect("Telegram_bot.db", check_same_thread=False)
 cursor = conn.cursor()
 
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER UNIQUE,
-        username TEXT,
-        first_name TEXT,
-        last_name TEXT
-    )
-""")
-conn.commit()
+monitoring = False
+monitoring_event = threading.Event()
+
+# cursor.execute("""
+#     CREATE TABLE IF NOT EXISTS users (
+#         id INTEGER PRIMARY KEY AUTOINCREMENT,
+#         user_id INTEGER UNIQUE,
+#         username TEXT,
+#         first_name TEXT,
+#         last_name TEXT
+#     )
+# """)
+# conn.commit()
 
 req = Request(connect_timeout=1.0, read_timeout=1.0)
 bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN, request=req)
@@ -74,25 +78,47 @@ def start(update, context):
         f"Hello {user.first_name}, you have been registered!")
 
 
+def stop(update, context):
+    global monitoring_event
+    monitoring_event.set()
+    global monitoring
+    monitoring = False
+    update.message.reply_text("Monitoring stopped")
+
+
 def screenshot(update, context):
+    global monitoring
+    global monitoring_event
+
+    monitoring = False
+    monitoring_event.set()
+
+    monitoring_event = threading.Event()
+    monitoring = True
+
     if update.message:
         update.message.reply_text("Monitoring...")
     else:
         context.bot.send_message(
             chat_id=update.effective_chat.id, text="Monitoring...")
 
-    event_handler = ScreenshotHandler()
-    observer = Observer()
-    observer.schedule(event_handler, path=SCREENSHOT_DIR, recursive=False)
-    observer.start()
-    print(f"Watching for screenshots in {SCREENSHOT_DIR}")
+    def monitor():
+        event_handler = ScreenshotHandler()
+        observer = Observer()
+        observer.schedule(event_handler, path=SCREENSHOT_DIR, recursive=False)
+        observer.start()
+        print(f"Watching for screenshots in {SCREENSHOT_DIR}")
 
-    try:
-        while True:
-            time.sleep(0.5)
-    except KeyboardInterrupt:
+        try:
+            while monitoring and not monitoring_event.is_set():
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            observer.stop()
         observer.stop()
-    observer.join()
+        observer.join()
+
+    monitor_thread = threading.Thread(target=monitor)
+    monitor_thread.start()
 
 
 def admin(update, context):
@@ -123,6 +149,7 @@ dispatcher.add_handler(CallbackQueryHandler(button))
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CommandHandler("screenshot", screenshot))
 dispatcher.add_handler(CommandHandler("admin", admin))
+dispatcher.add_handler(CommandHandler("stop", stop))
 
 updater.start_polling()
 updater.idle()
