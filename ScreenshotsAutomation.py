@@ -106,7 +106,7 @@ def save_user(user_id, username, first_name, last_name):
         print(f"New user {user_id} - {username} inserted")
 
     except sqlite3.IntegrityError as e:
-        print("insertion failed due to:" + e)
+        print("insertion failed due to:", e)
 
 
 def start(update, context):
