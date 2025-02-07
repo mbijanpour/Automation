@@ -160,72 +160,110 @@ def button(update, context):
 
 
 def handle_message(update, context):
-    if context.user_data.get('broadcast'):
-        cursor.execute("SELECT user_id FROM users")
-        users = cursor.fetchall()
+    user = update.message.from_user
+
+    if user.id == int(TELEGRAM_CHAT_ID):
+        if context.user_data.get('broadcast'):
+            cursor.execute("SELECT user_id FROM users")
+            users = cursor.fetchall()
+
+            if update.message.text:
+                message = update.message.text
+                for user in users:
+                    try:
+                        context.bot.send_message(chat_id=user[0], text=message)
+                    except telegram.error.Unauthorized:
+                        print(f"User {user[0]} has blocked the bot.")
+
+            elif update.message.sticker:
+                sticker = update.message.sticker.file_id
+                for user in users:
+                    try:
+                        context.bot.send_sticker(
+                            chat_id=user[0], sticker=sticker)
+                    except telegram.error.Unauthorized:
+                        print(f"User {user[0]} has blocked the bot.")
+
+            elif update.message.photo:
+                photo = update.message.photo[-1].file_id
+                for user in users:
+                    try:
+                        context.bot.send_photo(chat_id=user[0], photo=photo)
+                    except telegram.error.Unauthorized:
+                        print(f"User {user[0]} has blocked the bot.")
+
+            elif update.message.video:
+                video = update.message.video.file_id
+                for user in users:
+                    try:
+                        context.bot.send_video(chat_id=user[0], video=video)
+                    except telegram.error.Unauthorized:
+                        print(f"User {user[0]} has blocked the bot.")
+
+            elif update.message.document:
+                document = update.message.document.file_id
+                for user in users:
+                    try:
+                        context.bot.send_document(
+                            chat_id=user[0], document=document)
+                    except telegram.error.Unauthorized:
+                        print(f"User {user[0]} has blocked the bot.")
+
+            elif update.message.animation:
+                animation = update.message.animation.file_id
+                for user in users:
+                    try:
+                        context.bot.send_animation(
+                            chat_id=user[0], animation=animation)
+                    except telegram.error.Unauthorized:
+                        print(f"User {user[0]} has blocked the bot.")
+            context.user_data['broadcast'] = False
+
+        elif context.user_data.get('send_user'):
+            try:
+                id, message = update.message.text.split(':', 1)
+                context.bot.send_message(chat_id=id, text=message)
+                update.message.reply_text("Message sent to user.")
+            except ValueError:
+                update.message.reply_text(
+                    "Invalid format. Please use the format: user_id:message")
+            except telegram.error.Unauthorized:
+                print(f"User {id} has blocked the bot.")
+            context.user_data['send_user'] = False
+
+        elif context.user_data.get('update_user_id'):
+            new_user_id = update.message.text
+            update_user_id(new_user_id)
+            context.user_data['update_user_id'] = False
+    else:
+        user = update.message.from_user
+        print(f"A message from {user.username} - {user.id}")
 
         if update.message.text:
             message = update.message.text
-            for user in users:
-                try:
-                    context.bot.send_message(chat_id=user[0], text=message)
-                except telegram.error.Unauthorized:
-                    print(f"User {user[0]} has blocked the bot.")
-        elif update.message.sticker:
-            sticker = update.message.sticker.file_id
-            for user in users:
-                try:
-                    context.bot.send_sticker(chat_id=user[0], sticker=sticker)
-                except telegram.error.Unauthorized:
-                    print(f"User {user[0]} has blocked the bot.")
-        elif update.message.photo:
-            photo = update.message.photo[-1].file_id
-            for user in users:
-                try:
-                    context.bot.send_photo(chat_id=user[0], photo=photo)
-                except telegram.error.Unauthorized:
-                    print(f"User {user[0]} has blocked the bot.")
+            context.bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+
         elif update.message.video:
             video = update.message.video.file_id
-            for user in users:
-                try:
-                    context.bot.send_video(chat_id=user[0], video=video)
-                except telegram.error.Unauthorized:
-                    print(f"User {user[0]} has blocked the bot.")
+            context.bot.send_video(chat_id=TELEGRAM_CHAT_ID, video=video)
+
+        elif update.message.photo:
+            photo = update.message.photo[-1].file_id
+            context.bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=photo)
+
         elif update.message.document:
             document = update.message.document.file_id
-            for user in users:
-                try:
-                    context.bot.send_document(
-                        chat_id=user[0], document=document)
-                except telegram.error.Unauthorized:
-                    print(f"User {user[0]} has blocked the bot.")
+            context.bot.send_document(
+                chat_id=TELEGRAM_CHAT_ID, document=document)
+
+        elif update.message.sticker:
+            photo = update.message.photo[-1].file_id
+            context.bot.send_sticker(chat_id=TELEGRAM_CHAT_ID, sticker=sticker)
+
         elif update.message.animation:
             animation = update.message.animation.file_id
-            for user in users:
-                try:
-                    context.bot.send_animation(
-                        chat_id=user[0], animation=animation)
-                except telegram.error.Unauthorized:
-                    print(f"User {user[0]} has blocked the bot.")
-        context.user_data['broadcast'] = False
-
-    elif context.user_data.get('send_user'):
-        try:
-            id, message = update.message.text.split(':', 1)
-            context.bot.send_message(chat_id=id, text=message)
-            update.message.reply_text("Message sent to user.")
-        except ValueError:
-            update.message.reply_text(
-                "Invalid format. Please use the format: user_id:message")
-        except telegram.error.Unauthorized:
-            print(f"User {id} has blocked the bot.")
-        context.user_data['send_user'] = False
-
-    elif context.user_data.get('update_user_id'):
-        new_user_id = update.message.text
-        update_user_id(new_user_id)
-        context.user_data['update_user_id'] = False
+            context.bot.send_animation(
+                chat_id=TELEGRAM_CHAT_ID, animation=animation)
 
 
 updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
@@ -236,8 +274,10 @@ dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CommandHandler("screenshot", screenshot))
 dispatcher.add_handler(CommandHandler("admin", admin))
 dispatcher.add_handler(CommandHandler("stop", stop))
+
 dispatcher.add_handler(MessageHandler(
     Filters.text & ~Filters.command, handle_message))
+
 dispatcher.add_handler(MessageHandler(Filters.photo, handle_message))
 dispatcher.add_handler(MessageHandler(Filters.video, handle_message))
 dispatcher.add_handler(MessageHandler(Filters.document, handle_message))
